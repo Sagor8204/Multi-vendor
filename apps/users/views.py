@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .serializers import *
-from common.utils.response import api_response
+from apps.core.utils.response import api_response
 
 User = get_user_model()
 
