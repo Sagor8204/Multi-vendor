@@ -128,3 +128,68 @@ class UserDetailView(generics.RetrieveUpdateAPIView):
             data=response.data,
             status=status.HTTP_200_OK
         )
+
+
+class AddressListCreateView(generics.ListCreateAPIView):
+    serializer_class = AddressSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get_queryset(self):
+        return Address.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return api_response(
+            success=True,
+            message="Addresses fetched successfully",
+            data=serializer.data,
+            status=status.HTTP_200_OK
+        )
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        return api_response(
+            success=True,
+            message="Address created successfully",
+            data=response.data,
+            status=status.HTTP_201_CREATED
+        )
+
+
+class AddressDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = AddressSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get_queryset(self):
+        return Address.objects.filter(user=self.request.user)
+
+    def retrieve(self, request, *args, **kwargs):
+        response = super().retrieve(request, *args, **kwargs)
+        return api_response(
+            success=True,
+            message="Address details fetched",
+            data=response.data,
+            status=status.HTTP_200_OK
+        )
+
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        return api_response(
+            success=True,
+            message="Address updated successfully",
+            data=response.data,
+            status=status.HTTP_200_OK
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        super().destroy(request, *args, **kwargs)
+        return api_response(
+            success=True,
+            message="Address deleted successfully",
+            data=None,
+            status=status.HTTP_204_NO_CONTENT
+        )

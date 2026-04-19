@@ -16,3 +16,17 @@ class User(AbstractUser, BaseModel):
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
+
+
+class Address(BaseModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    full_name = models.CharField(max_length=255)
+    phone = models.CharField(max_length=20)
+    address_line = models.TextField()
+    city = models.CharField(max_length=100)
+    postal_code = models.CharField(max_length=20)
+    country = models.CharField(max_length=100)
+
+    is_default = models.BooleanField(default=False)
+
