@@ -45,7 +45,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Local apps
+    'apps.core',
     'apps.users',
+    'apps.vendor',
     'apps.products',
     'apps.orders',
     'apps.payments',
@@ -64,7 +66,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-    'EXCEPTION_HANDLER': 'common.utils.exceptions.custom_exception_handler',
+    'EXCEPTION_HANDLER': 'apps.core.utils.exceptions.custom_exception_handler',
 }
 
 SPECTACULAR_SETTINGS = {

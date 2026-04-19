@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-from common.models.models import BaseModel
+from apps.core.models import BaseModel
 
 # Create your models here.
 class User(AbstractUser, BaseModel):
