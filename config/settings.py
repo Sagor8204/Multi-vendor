@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'apps.users',
     'apps.vendor',
     'apps.products',
+    'apps.cart',
     'apps.orders',
     'apps.payments',
     # Third-party apps
