@@ -1,13 +1,21 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Address
+from .models import Address, UserProfile
 
 User = get_user_model()
 
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ('id', 'profile_image', 'phone', 'bio', 'date_of_birth', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
 class UserSerializer(serializers.ModelSerializer):
+    profile = UserProfileSerializer(read_only=True)
+    
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'role', 'is_verified')
+        fields = ('id', 'username', 'email', 'role', 'is_verified', 'profile')
         read_only_fields = ('id', 'role', 'is_verified')
 
 class AddressSerializer(serializers.ModelSerializer):

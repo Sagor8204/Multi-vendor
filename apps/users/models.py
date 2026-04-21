@@ -30,3 +30,11 @@ class Address(BaseModel):
 
     is_default = models.BooleanField(default=False)
 
+class UserProfile(BaseModel):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+
+    profile_image = models.FileField(upload_to="profiles/", null=True, blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    bio = models.TextField(blank=True)
+
+    date_of_birth = models.DateField(null=True, blank=True)

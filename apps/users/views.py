@@ -76,13 +76,12 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
     """
     Get and update current user profile
     """
-    serializer_class = UserSerializer
+    serializer_class = UserProfileSerializer
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_object(self):
-        return self.request.user
+        return self.request.user.profile
 
-    # GET
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
@@ -93,13 +92,35 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
             status=status.HTTP_200_OK
         )
 
-    # PUT/PATCH
     def update(self, request, *args, **kwargs):
-        response = super().update(request, *args, **kwargs)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
         return api_response(
             success=True,
             message="Profile updated successfully",
-            data=response.data,
+            data=serializer.data,
+            status=status.HTTP_200_OK
+        )
+
+class AdminUserProfileDetailView(generics.RetrieveAPIView):
+    """
+    Admin: Get specific user profile by user id
+    GET /api/users/{id}/profile/
+    """
+    queryset = UserProfile.objects.all()
+    serializer_class = UserProfileSerializer
+    permission_classes = (permissions.IsAdminUser,)
+    lookup_field = 'user_id'
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return api_response(
+            success=True,
+            message="User profile fetched",
+            data=serializer.data,
             status=status.HTTP_200_OK
         )
 
