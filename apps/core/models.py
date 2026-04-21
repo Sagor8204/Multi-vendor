@@ -10,7 +10,7 @@ class BaseModel(models.Model):
         abstract = True
 
 class File(BaseModel):
-    file = models.FileField(upload_to='media/')
+    file = models.FileField(upload_to='images/')
     file_type = models.CharField(max_length=50, blank=True)
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
