@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from apps.review.views import ProductReviewListView
 
 app_name = 'products'
 
@@ -12,6 +13,7 @@ urlpatterns = [
     path('', views.ProductListCreateView.as_view(), name='product-list'),
     path('vendor/<int:vendor_id>/', views.VendorProductListView.as_view(), name='vendor-product-list'),
     path('<str:pk_or_slug>/', views.ProductDetailView.as_view(), name='product-detail'),
+    path('<int:product_id>/reviews/', ProductReviewListView.as_view(), name='product-reviews'),
 
     # Image management
     path('<int:product_id>/images/', views.ProductImageUploadView.as_view(), name='product-image-upload'),
