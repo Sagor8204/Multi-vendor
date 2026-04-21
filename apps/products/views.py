@@ -1,8 +1,12 @@
 from rest_framework import generics, status, permissions
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from .models import Category, Product, ProductImage
-from .serializers import CategorySerializer, ProductSerializer, ProductImageSerializer
+from .serializers import (
+    CategorySerializer, ProductSerializer, 
+    ProductImageSerializer, ProductImageUploadSerializer
+)
 from apps.core.utils.response import api_response
 from apps.vendor.models import Vendor
 
@@ -179,4 +183,103 @@ class VendorProductListView(generics.ListAPIView):
             message="Vendor products fetched successfully",
             data=serializer.data,
             status=status.HTTP_200_OK
+        )
+
+class ProductImageUploadView(generics.CreateAPIView):
+    """
+    POST: Upload multiple images for a specific product with metadata
+    Example keys for form-data:
+    - images[0]image (File)
+    - images[0]alt_text (Text)
+    - images[0]is_main (Text: true/false)
+    """
+    serializer_class = ProductImageUploadSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def parse_nested_data(self, data):
+        """
+        Helper to convert flat QueryDict into nested dictionary for images
+        Converts {"images[0]image": file, "images[0]alt_text": "..."} 
+        to {"images": [{"image": file, "alt_text": "..."}]}
+        """
+        nested_data = {"images": []}
+        # Find all indices used in the request
+        indices = set()
+        for key in data.keys():
+            if key.startswith('images[') and ']' in key:
+                index = key.split('[')[1].split(']')[0]
+                if index.isdigit():
+                    indices.add(int(index))
+
+        # Sort indices to maintain order
+        for i in sorted(list(indices)):
+            item = {}
+            for field in ['image', 'alt_text', 'is_main', 'order']:
+                key = f'images[{i}]{field}'
+                if key in data:
+                    item[field] = data[key]
+            
+            # Also check FILES if image is missing from data
+            file_key = f'images[{i}]image'
+            if file_key in self.request.FILES:
+                item['image'] = self.request.FILES[file_key]
+                
+            if item:
+                nested_data['images'].append(item)
+        
+        return nested_data
+
+    def create(self, request, *args, **kwargs):
+        product_id = self.kwargs.get('product_id')
+        product = get_object_or_404(Product, id=product_id)
+
+        if product.vendor.user != request.user:
+            return api_response(
+                success=False,
+                message="You don't have permission to upload images for this product",
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Parse the indexed data before passing to serializer
+        data = self.parse_nested_data(request.data)
+        
+        serializer = self.get_serializer(data=data, context={'product_id': product_id})
+        serializer.is_valid(raise_exception=True)
+        images = serializer.save()
+
+        return api_response(
+            success=True,
+            message=f"{len(images)} images uploaded successfully",
+            data=ProductImageSerializer(images, many=True).data,
+            status=status.HTTP_201_CREATED
+        )
+
+class ProductImageDeleteView(generics.DestroyAPIView):
+    """
+    DELETE: Delete a specific product image
+    """
+    queryset = ProductImage.objects.all()
+    serializer_class = ProductImageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'pk'
+    lookup_url_kwarg = 'image_id'
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        
+        # Check if the user is the vendor of the product
+        if instance.product.vendor.user != request.user:
+            return api_response(
+                success=False,
+                message="You don't have permission to delete this image",
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        super().destroy(request, *args, **kwargs)
+        return api_response(
+            success=True,
+            message="Image deleted successfully",
+            data=None,
+            status=status.HTTP_204_NO_CONTENT
         )
