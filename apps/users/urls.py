@@ -19,6 +19,6 @@ urlpatterns = [
     path('addresses/', AddressListCreateView.as_view(), name='address_list_create'),
     path('addresses/<int:pk>/', AddressDetailView.as_view(), name='address_detail'),
     
-    path('me', UserDetailView.as_view(), name='user_me'), # Existing me route using UserDetailView
+    path('me/', UserDetailView.as_view(), name='user_me'), # Existing me route using UserDetailView
     path('<int:pk>', UserDetailView.as_view(), name='user_detail'),
 ]

@@ -8,6 +8,8 @@ class Category(BaseModel):
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE)
+    description = models.TextField(null=True, blank=True)
+    icon = models.FileField(upload_to="category_icons/", null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -32,7 +34,7 @@ class Product(BaseModel):
         super().save(*args, **kwargs)
 
 class ProductImage(BaseModel):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
     image = models.FileField(upload_to='products/')
     alt_text = models.CharField(max_length=255, blank=True)
     is_main = models.BooleanField(default=False)

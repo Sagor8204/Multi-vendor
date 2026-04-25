@@ -11,8 +11,17 @@ from apps.core.utils.response import api_response
 from apps.vendor.models import Vendor
 
 class CategoryListCreateView(generics.ListCreateAPIView):
-    queryset = Category.objects.all()
     serializer_class = CategorySerializer
+
+    def get_queryset(self):
+        queryset = Category.objects.all()
+        parent_id = self.request.query_params.get('parent')
+        if parent_id:
+            if parent_id == 'null':
+                queryset = queryset.filter(parent__isnull=True)
+            else:
+                queryset = queryset.filter(parent_id=parent_id)
+        return queryset
 
     def get_permissions(self):
         if self.request.method == 'GET':
@@ -83,8 +92,36 @@ class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
         )
 
 class ProductListCreateView(generics.ListCreateAPIView):
-    queryset = Product.objects.all()
     serializer_class = ProductSerializer
+
+    def get_queryset(self):
+        queryset = Product.objects.all()
+        category_id = self.request.query_params.get('category')
+        category_slug = self.request.query_params.get('category_slug')
+
+        if category_id or category_slug:
+            # Get the category
+            if category_id:
+                target_category = get_object_or_404(Category, id=category_id)
+            else:
+                target_category = get_object_or_404(Category, slug=category_slug)
+            
+            # Recursive helper to get all subcategory IDs
+            def get_all_category_ids(category):
+                ids = [category.id]
+                for child in Category.objects.filter(parent=category):
+                    ids.extend(get_all_category_ids(child))
+                return ids
+            
+            category_ids = get_all_category_ids(target_category)
+            queryset = queryset.filter(category_id__in=category_ids)
+
+        # Search by name
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(name__icontains=search)
+
+        return queryset
 
     def get_permissions(self):
         if self.request.method == 'GET':

@@ -137,5 +137,4 @@ media/
 *.pem
 secrets.json
 
-# documentation
-API_STRUCTURE.txt
+boilerplate.txt

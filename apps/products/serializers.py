@@ -2,9 +2,17 @@ from rest_framework import serializers
 from .models import Category, Product, ProductImage
 
 class CategorySerializer(serializers.ModelSerializer):
+    product_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Category
-        fields = "__all__"
+        fields = (
+            'id', 'name', 'slug', 'parent', 'description', 'icon', 
+            'product_count', 'created_at', 'updated_at'
+        )
+
+    def get_product_count(self, obj):
+        return obj.product_set.count()
 
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -47,6 +55,11 @@ class ProductImageUploadSerializer(serializers.Serializer):
         return saved_images
 
 class ProductSerializer(serializers.ModelSerializer):
+    images = ProductImageSerializer(many=True, read_only=True)
+
     class Meta:
         model = Product
-        fields = "__all__"
+        fields = (
+            'id', 'vendor', 'name', 'slug', 'description', 'category',
+            'price', 'stock', 'images', 'created_at', 'updated_at'
+        )

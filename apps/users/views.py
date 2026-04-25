@@ -126,27 +126,37 @@ class AdminUserProfileDetailView(generics.RetrieveAPIView):
 
 class UserDetailView(generics.RetrieveUpdateAPIView):
     """
-    Get and update a specific user by id
+    Get and update a specific user by id or current user
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = (permissions.IsAuthenticated,)
 
+    def get_object(self):
+        pk = self.kwargs.get('pk')
+        if pk is None:
+            return self.request.user
+        return super().get_object()
+
     def retrieve(self, request, *args, **kwargs):
-        response = super().retrieve(request, *args, **kwargs)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
         return api_response(
             success=True,
             message="User details fetched",
-            data=response.data,
+            data=serializer.data,
             status=status.HTTP_200_OK
         )
 
     def update(self, request, *args, **kwargs):
-        response = super().update(request, *args, **kwargs)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
         return api_response(
             success=True,
             message="User updated successfully",
-            data=response.data,
+            data=serializer.data,
             status=status.HTTP_200_OK
         )
 
