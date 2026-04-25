@@ -95,7 +95,20 @@ class ProductListCreateView(generics.ListCreateAPIView):
     serializer_class = ProductSerializer
 
     def get_queryset(self):
-        queryset = Product.objects.all()
+        user = self.request.user
+        
+        # Base filtering for status and activity
+        if user.is_authenticated:
+            try:
+                vendor = Vendor.objects.get(user=user)
+                queryset = Product.objects.filter(
+                    Q(status='published', is_active=True) | Q(vendor=vendor)
+                )
+            except Vendor.DoesNotExist:
+                queryset = Product.objects.filter(status='published', is_active=True)
+        else:
+            queryset = Product.objects.filter(status='published', is_active=True)
+
         category_id = self.request.query_params.get('category')
         category_slug = self.request.query_params.get('category_slug')
 
@@ -121,7 +134,37 @@ class ProductListCreateView(generics.ListCreateAPIView):
         if search:
             queryset = queryset.filter(name__icontains=search)
 
-        return queryset
+        # --- Filtering & Sorting Flags ---
+
+        # 1. Featured Products
+        featured = self.request.query_params.get('featured')
+        if featured == 'true':
+            queryset = queryset.filter(is_featured=True)
+
+        # 2. On Sale (Products with discounts)
+        on_sale = self.request.query_params.get('on_sale')
+        if on_sale == 'true':
+            queryset = queryset.filter(discount_price__isnull=False, discount_price__gt=0)
+
+        # 3. New Arrivals (Last 30 days)
+        new_arrivals = self.request.query_params.get('new_arrivals')
+        if new_arrivals == 'true':
+            from django.utils import timezone
+            from datetime import timedelta
+            thirty_days_ago = timezone.now() - timedelta(days=30)
+            queryset = queryset.filter(created_at__gte=thirty_days_ago)
+
+        # 4. Trending (Sorting by views)
+        trending = self.request.query_params.get('trending')
+        if trending == 'true':
+            queryset = queryset.order_by('-views_count')
+        
+        # Generic ordering
+        ordering = self.request.query_params.get('ordering')
+        if ordering:
+            queryset = queryset.order_by(ordering)
+
+        return queryset.distinct()
 
     def get_permissions(self):
         if self.request.method == 'GET':
@@ -130,7 +173,8 @@ class ProductListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         vendor = get_object_or_404(Vendor, user=self.request.user)
-        serializer.save(vendor=vendor)
+        # Products created by vendors default to 'pending' status
+        serializer.save(vendor=vendor, status='pending')
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -148,7 +192,7 @@ class ProductListCreateView(generics.ListCreateAPIView):
         self.perform_create(serializer)
         return api_response(
             success=True,
-            message="Product created successfully",
+            message="Product created successfully and is pending approval",
             data=serializer.data,
             status=status.HTTP_201_CREATED
         )
@@ -165,7 +209,22 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_object(self):
         val = self.kwargs.get(self.lookup_url_kwarg)
-        return get_object_or_404(Product, Q(pk=val) if val.isdigit() else Q(slug=val))
+        user = self.request.user
+        
+        product = get_object_or_404(Product, Q(pk=val) if val.isdigit() else Q(slug=val))
+        
+        # If not published/active, only the owner or admin can see it
+        if product.status != 'published' or not product.is_active:
+            if not user.is_authenticated or (product.vendor.user != user and not user.is_staff):
+                from django.http import Http404
+                raise Http404
+        
+        # Increment view count on retrieve
+        if self.request.method == 'GET':
+            product.views_count += 1
+            product.save(update_fields=['views_count'])
+            
+        return product
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -182,6 +241,9 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance = self.get_object()
         if instance.vendor.user != self.request.user:
             return api_response(success=False, message="Permission denied", status=status.HTTP_403_FORBIDDEN)
+        
+        # If product was rejected or published, any update might need re-approval
+        # For now, let's just keep the status as is unless we want to force re-approval
         
         response = super().update(request, *args, **kwargs)
         return api_response(
@@ -210,7 +272,24 @@ class VendorProductListView(generics.ListAPIView):
 
     def get_queryset(self):
         vendor_id = self.kwargs.get('vendor_id')
-        return Product.objects.filter(vendor_id=vendor_id)
+        user = self.request.user
+        
+        queryset = Product.objects.filter(vendor_id=vendor_id)
+        
+        # Check if the requesting user is the owner of this vendor
+        is_owner = False
+        if user.is_authenticated:
+            try:
+                vendor = Vendor.objects.get(user=user)
+                if vendor.id == int(vendor_id):
+                    is_owner = True
+            except (Vendor.DoesNotExist, ValueError):
+                pass
+        
+        if not is_owner:
+            queryset = queryset.filter(status='published', is_active=True)
+            
+        return queryset
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Product, ProductImage
+from .models import Category, Product, ProductImage, ProductAttribute, ProductAttributeValue, ProductVariant, ProductSpecification
 
 class CategorySerializer(serializers.ModelSerializer):
     product_count = serializers.SerializerMethodField()
@@ -12,7 +12,34 @@ class CategorySerializer(serializers.ModelSerializer):
         )
 
     def get_product_count(self, obj):
-        return obj.product_set.count()
+        return obj.product_set.filter(status="published").count()
+
+class ProductAttributeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductAttribute
+        fields = ('id', 'name')
+
+class ProductAttributeValueSerializer(serializers.ModelSerializer):
+    attribute_name = serializers.ReadOnlyField(source='attribute.name')
+
+    class Meta:
+        model = ProductAttributeValue
+        fields = ('id', 'attribute', 'attribute_name', 'value')
+
+class ProductVariantSerializer(serializers.ModelSerializer):
+    attribute_values_detail = ProductAttributeValueSerializer(many=True, read_only=True, source='attribute_values')
+    
+    class Meta:
+        model = ProductVariant
+        fields = ('id', 'sku', 'price', 'stock', 'attribute_values', 'attribute_values_detail')
+        extra_kwargs = {
+            'attribute_values': {'write_only': True}
+        }
+
+class ProductSpecificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductSpecification
+        fields = ('id', 'key', 'value')
 
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -44,9 +71,6 @@ class ProductImageUploadSerializer(serializers.Serializer):
                 order=item.get('order', 0)
             ))
         
-        # Using a simple loop or bulk_create (Note: bulk_create doesn't call save() methods)
-        # If your model has custom save logic (like the ordering logic we saw), 
-        # it's safer to save them individually or handle logic here.
         saved_images = []
         for img in product_images:
             img.save()
@@ -56,10 +80,31 @@ class ProductImageUploadSerializer(serializers.Serializer):
 
 class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
+    variants = ProductVariantSerializer(many=True, required=False)
+    specifications = ProductSpecificationSerializer(many=True, required=False)
 
     class Meta:
         model = Product
         fields = (
             'id', 'vendor', 'name', 'slug', 'description', 'category',
-            'price', 'stock', 'images', 'created_at', 'updated_at'
+            'price', 'discount_price', 'discount_percentage', 'stock', 'status', 'is_featured',
+            'views_count', 'images', 'variants', 'specifications',
+            'created_at', 'updated_at'
         )
+        read_only_fields = ('vendor', 'slug', 'status', 'views_count', 'discount_percentage')
+
+    def create(self, validated_data):
+        variants_data = validated_data.pop('variants', [])
+        specs_data = validated_data.pop('specifications', [])
+        
+        product = Product.objects.create(**validated_data)
+        
+        for variant_data in variants_data:
+            attr_values = variant_data.pop('attribute_values', [])
+            variant = ProductVariant.objects.create(product=product, **variant_data)
+            variant.attribute_values.set(attr_values)
+            
+        for spec_data in specs_data:
+            ProductSpecification.objects.create(product=product, **spec_data)
+            
+        return product
