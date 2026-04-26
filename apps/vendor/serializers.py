@@ -10,11 +10,15 @@ class FileSerializer(serializers.ModelSerializer):
 class VendorSerializer(serializers.ModelSerializer):
     # This field handles the file upload for PUT/PATCH
     store_logo = serializers.FileField(required=False, write_only=True)
+    products = serializers.SerializerMethodField()
 
     class Meta:
         model = Vendor
-        fields = ['id', 'store_name', 'store_logo', 'store_description', 'is_approved', 'created_at']
+        fields = ['id', 'store_name', 'store_logo', 'store_description', 'products', 'is_approved', 'created_at']
         read_only_fields = ['id', 'is_approved', 'created_at']
+
+    def get_products(self,obj):
+        return obj.product_set.filter(vendor=obj.id).count()
 
     def update(self, instance, validated_data):
         user = self.context['request'].user
