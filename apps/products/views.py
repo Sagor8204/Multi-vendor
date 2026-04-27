@@ -399,3 +399,61 @@ class ProductImageDeleteView(generics.DestroyAPIView):
             data=None,
             status=status.HTTP_204_NO_CONTENT
         )
+
+class ProductSearchView(generics.ListAPIView):
+    serializer_class = ProductSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        queryset = Product.objects.filter(status='published', is_active=True)
+        
+        # Search by name and description
+        query = self.request.query_params.get('q')
+        if query:
+            queryset = queryset.filter(
+                Q(name__icontains=query) | 
+                Q(description__icontains=query)
+            )
+
+        # Filter by category
+        category_slug = self.request.query_params.get('category')
+        if category_slug:
+            queryset = queryset.filter(category__slug=category_slug)
+
+        # Filter by price range
+        min_price = self.request.query_params.get('min_price')
+        max_price = self.request.query_params.get('max_price')
+        
+        if min_price:
+            queryset = queryset.filter(price__gte=min_price)
+        if max_price:
+            queryset = queryset.filter(price__lte=max_price)
+
+        # Ordering
+        sort = self.request.query_params.get('sort')
+        if sort == 'price_low':
+            queryset = queryset.order_by('price')
+        elif sort == 'price_high':
+            queryset = queryset.order_by('-price')
+        elif sort == 'newest':
+            queryset = queryset.order_by('-created_at')
+        elif sort == 'popular':
+            queryset = queryset.order_by('-views_count')
+        
+        return queryset.distinct()
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return api_response(
+            success=True,
+            message="Search results fetched successfully",
+            data=serializer.data,
+            status=status.HTTP_200_OK
+        )

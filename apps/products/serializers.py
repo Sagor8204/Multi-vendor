@@ -1,5 +1,27 @@
+from django.db.models import Avg
 from rest_framework import serializers
 from .models import Category, Product, ProductImage, ProductAttribute, ProductAttributeValue, ProductVariant, ProductSpecification
+from apps.vendor.models import Vendor
+from apps.review.models import Review
+from apps.users.models import User
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = "__all__"
+
+class ReviewSerializer(serializers.ModelSerializer):
+    user = UserSerializer()
+
+    class Meta:
+        model = Review
+        fields = "__all__"
+
+class vendorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Vendor
+        fields = "__all__"
 
 class CategorySerializer(serializers.ModelSerializer):
     product_count = serializers.SerializerMethodField()
@@ -82,16 +104,29 @@ class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
     variants = ProductVariantSerializer(many=True, required=False)
     specifications = ProductSpecificationSerializer(many=True, required=False)
+    vendor = vendorSerializer(read_only=True)
+    category = CategorySerializer(read_only=True)
+    reviews = ReviewSerializer(many=True, read_only=True)
+
+    average_rating = serializers.SerializerMethodField()
+    total_review = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = (
             'id', 'vendor', 'name', 'slug', 'description', 'category',
             'price', 'discount_price', 'discount_percentage', 'stock', 'status', 'is_featured',
-            'views_count', 'images', 'variants', 'specifications',
+            'views_count', 'images', 'variants', 'specifications', 'reviews', 'average_rating', 'total_review',
             'created_at', 'updated_at'
         )
         read_only_fields = ('vendor', 'slug', 'status', 'views_count', 'discount_percentage')
+
+    def get_average_rating(self, obj):
+        average = obj.reviews.aggregate(Avg('rating')).get('rating__avg')
+        return average if average else 0
+
+    def get_total_review(self, obj):
+        return obj.reviews.count()
 
     def create(self, validated_data):
         variants_data = validated_data.pop('variants', [])

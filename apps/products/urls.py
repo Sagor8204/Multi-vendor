@@ -11,6 +11,7 @@ urlpatterns = [
 
     # Product endpoints
     path('', views.ProductListCreateView.as_view(), name='product-list'),
+    path('search/', views.ProductSearchView.as_view(), name='product-search'),
     path('vendor/<int:vendor_id>/', views.VendorProductListView.as_view(), name='vendor-product-list'),
     path('<str:pk_or_slug>/', views.ProductDetailView.as_view(), name='product-detail'),
     path('<int:product_id>/reviews/', ProductReviewListView.as_view(), name='product-reviews'),

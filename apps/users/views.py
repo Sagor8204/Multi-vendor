@@ -29,6 +29,7 @@ class RegisterView(generics.CreateAPIView):
 
 class LoginView(TokenObtainPairView):
     permission_classes = (permissions.AllowAny,)
+    serializer_class = MyTokenObtainPairSerializer
 
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
