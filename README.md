@@ -43,6 +43,18 @@ A robust, scalable multi-vendor e-commerce platform built with Django Rest Frame
 4. **Run Migrations**: `python manage.py migrate`
 5. **Start Server**: `python manage.py runserver`
 
+## 🧪 Seeding the Database
+
+Populate your database with fake data for testing purposes using the custom management command:
+
+```powershell
+# Default: 5 vendors, 10 customers, 30 products
+python manage.py seed_db
+
+# Custom amounts:
+python manage.py seed_db --vendors 10 --customers 50 --products 100 --reviews 10
+```
+
 ## 📖 API Documentation
 
 Once the server is running, access the interactive docs at:
