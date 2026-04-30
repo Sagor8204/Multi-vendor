@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from .models import Vendor
 from apps.core.models import File
+from apps.review.models import Review
+from django.db.models import Avg
 
 class FileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -10,15 +12,25 @@ class FileSerializer(serializers.ModelSerializer):
 class VendorSerializer(serializers.ModelSerializer):
     # This field handles the file upload for PUT/PATCH
     store_logo = serializers.FileField(required=False, write_only=True)
-    products = serializers.SerializerMethodField()
+    product_count = serializers.SerializerMethodField()
+    vendor_rating = serializers.SerializerMethodField()
+    total_reviews = serializers.SerializerMethodField()
 
     class Meta:
         model = Vendor
-        fields = ['id', 'store_name', 'store_logo', 'store_description', 'products', 'is_approved', 'created_at']
+        fields = ['id', 'store_name', 'store_logo', 'store_description', 'product_count', 'is_approved', 'vendor_rating', 'total_reviews', 'created_at']
         read_only_fields = ['id', 'is_approved', 'created_at']
 
-    def get_products(self,obj):
+    def get_product_count(self,obj):
         return obj.product_set.filter(vendor=obj.id).count()
+
+    def get_vendor_rating(self, obj):
+        average = Review.objects.filter(product__vendor=obj).aggregate(Avg('rating'))['rating__avg']
+        
+        return round(average, 1) if average is not None else 0.0
+
+    def get_total_reviews(self, obj):
+        return Review.objects.filter(product__vendor=obj).count()
 
     def update(self, instance, validated_data):
         user = self.context['request'].user
