@@ -1,0 +1,90 @@
+{
+  "success": true,
+  "message": "Advanced search results fetched successfully",
+  "data": {
+    "results": [
+      {
+        "id": 101,
+        "vendor": {
+          "id": 11,
+          "created_at": "2026-05-23T07:47:09.414524Z",
+          "updated_at": "2026-05-23T07:47:09.414551Z",
+          "is_active": true,
+          "store_name": "Test Shop",
+          "store_description": "",
+          "is_approved": false,
+          "user": 64,
+          "store_logo": null
+        },
+        "name": "iPhone 15",
+        "slug": "iphone-15",
+        "description": "Latest smartphone from Apple",
+        "category": {
+          "id": 1,
+          "name": "Electronics",
+          "slug": "electronics",
+          "parent": null,
+          "description": "Crime age significant easy control.",
+          "icon": null,
+          "product_count": 21,
+          "created_at": "2026-05-06T04:58:55.421850Z",
+          "updated_at": "2026-05-06T04:58:55.421881Z"
+        },
+        "price": "999.00",
+        "discount_price": null,
+        "discount_percentage": 0,
+        "stock": 0,
+        "status": "published",
+        "is_featured": false,
+        "views_count": 0,
+        "images": [],
+        "variants": [
+          {
+            "id": 301,
+            "sku": "iphone15-red",
+            "price": "999.00",
+            "stock": 10,
+            "attribute_values_detail": [
+              {
+                "id": 1,
+                "attribute": 1,
+                "attribute_name": "Color",
+                "value": "Red"
+              }
+            ]
+          }
+        ],
+        "specifications": [],
+        "reviews": [],
+        "average_rating": 0,
+        "total_review": 0,
+        "created_at": "2026-05-23T07:47:09.425882Z",
+        "updated_at": "2026-05-23T07:47:09.425895Z"
+      }
+    ],
+    "facets": {
+      "price_range": {
+        "min": 999.0,
+        "max": 999.0
+      },
+      "categories": [
+        {
+          "id": 1,
+          "name": "Electronics",
+          "slug": "electronics",
+          "count": 1
+        }
+      ],
+      "attributes": {
+        "Color": [
+          {
+            "id": 1,
+            "value": "Red",
+            "count": 1
+          }
+        ]
+      }
+    }
+  },
+  "errors": null
+}

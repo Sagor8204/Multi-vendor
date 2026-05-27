@@ -1,8 +1,9 @@
 from rest_framework import generics, status, permissions
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
-from django.db.models import Q
-from .models import Category, Product, ProductImage
+from django.db.models import Q, Min, Max, Count, Avg
+from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank, TrigramSimilarity
+from .models import Category, Product, ProductImage, ProductAttributeValue
 from .serializers import (
     CategorySerializer, ProductSerializer, 
     ProductImageSerializer, ProductImageUploadSerializer
@@ -457,3 +458,171 @@ class ProductSearchView(generics.ListAPIView):
             data=serializer.data,
             status=status.HTTP_200_OK
         )
+
+class AdvancedProductSearchView(generics.ListAPIView):
+    """
+    Advanced search with typo tolerance and faceted aggregations.
+    """
+    serializer_class = ProductSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        queryset = Product.objects.filter(status='published', is_active=True).annotate(
+            avg_rating=Avg('reviews__rating')
+        )
+        query = self.request.query_params.get('q')
+
+        if query:
+            # 1. Try Full-Text Search first
+            vector = SearchVector('name', weight='A') + SearchVector('description', weight='B')
+            search_query = SearchQuery(query)
+            
+            fts_queryset = queryset.annotate(
+                rank=SearchRank(vector, search_query)
+            ).filter(rank__gte=0.1).order_by('-rank')
+
+            # 2. If FTS finds nothing, use Trigram Similarity for typo tolerance
+            if not fts_queryset.exists():
+                queryset = queryset.annotate(
+                    similarity=TrigramSimilarity('name', query)
+                ).filter(similarity__gt=0.2).order_by('-similarity')
+            else:
+                queryset = fts_queryset
+
+        # Filter by category
+        category_slug = self.request.query_params.get('category')
+        if category_slug:
+            queryset = queryset.filter(category__slug=category_slug)
+
+        # Filter by price range
+        min_price = self.request.query_params.get('min_price')
+        max_price = self.request.query_params.get('max_price')
+        if min_price:
+            queryset = queryset.filter(price__gte=min_price)
+        if max_price:
+            queryset = queryset.filter(price__lte=max_price)
+
+        # Filter by Color
+        colors = self.request.query_params.getlist('color') + self.request.query_params.getlist('color[]')
+        if colors:
+            color_list = []
+            for c in colors:
+                color_list.extend(c.split(','))
+            queryset = queryset.filter(variants__attribute_values__value__in=color_list, variants__attribute_values__attribute__name__iexact='Color')
+
+        # Filter by Size
+        sizes = self.request.query_params.getlist('size') + self.request.query_params.getlist('size[]')
+        if sizes:
+            size_list = []
+            for s in sizes:
+                size_list.extend(s.split(','))
+            queryset = queryset.filter(variants__attribute_values__value__in=size_list, variants__attribute_values__attribute__name__iexact='Size')
+
+        # Filter by Rating (e.g., ?rating=4 means 4 stars and up)
+        ratings = self.request.query_params.getlist('rating') + self.request.query_params.getlist('rating[]')
+        if ratings:
+            rating_list = []
+            for r in ratings:
+                rating_list.extend(r.split(','))
+            try:
+                min_rating = min([float(r) for r in rating_list])
+                queryset = queryset.filter(avg_rating__gte=min_rating)
+            except (ValueError, TypeError):
+                pass
+
+        # Generic Attribute Filter (Fallback)
+        attr_values = self.request.query_params.getlist('attribute_value')
+        if attr_values:
+            for val in attr_values:
+                queryset = queryset.filter(variants__attribute_values__value__iexact=val)
+
+        # Ordering
+        sort = self.request.query_params.get('sort')
+        if sort == 'price_low':
+            queryset = queryset.order_by('price')
+        elif sort == 'price_high':
+            queryset = queryset.order_by('-price')
+        elif sort == 'newest':
+            queryset = queryset.order_by('-created_at')
+        elif sort == 'popular':
+            queryset = queryset.order_by('-views_count')
+        elif sort == 'rating':
+            queryset = queryset.order_by('-avg_rating')
+        # If no explicit sort is provided but there is a query, 
+        # the queryset is already ordered by rank/similarity from the search block.
+
+        return queryset.distinct()
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        
+        # Calculate Facets before pagination
+        facets = self.get_facets(queryset)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            response_data = {
+                'results': serializer.data,
+                'facets': facets
+            }
+            return self.get_paginated_response(response_data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return api_response(
+            success=True,
+            message="Advanced search results fetched successfully",
+            data={
+                'results': serializer.data,
+                'facets': facets
+            },
+            status=status.HTTP_200_OK
+        )
+
+    def get_facets(self, queryset):
+        # 1. Price Range
+        price_range = queryset.aggregate(
+            min=Min('price'),
+            max=Max('price')
+        )
+
+        # 2. Categories
+        categories = Category.objects.filter(
+            product__in=queryset
+        ).annotate(
+            count=Count('product')
+        ).values('id', 'name', 'slug', 'count').order_by('-count')
+
+        # 3. Attributes
+        attributes = {}
+        attr_values = ProductAttributeValue.objects.filter(
+            variants__product__in=queryset
+        ).select_related('attribute').annotate(
+            count=Count('variants__product', distinct=True)
+        ).order_by('attribute__name', '-count')
+
+        for val in attr_values:
+            attr_name = val.attribute.name
+            if attr_name not in attributes:
+                attributes[attr_name] = []
+            attributes[attr_name].append({
+                'id': val.id,
+                'value': val.value,
+                'count': val.count
+            })
+
+        # 4. Ratings
+        rating_facets = []
+        for i in range(1, 6):
+            count = queryset.filter(avg_rating__gte=i).count()
+            rating_facets.append({
+                'rating': i,
+                'count': count
+            })
+
+        return {
+            'price_range': price_range,
+            'categories': list(categories),
+            'attributes': attributes,
+            'ratings': rating_facets
+        }
