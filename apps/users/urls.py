@@ -3,7 +3,8 @@ from .views import (
     RegisterView, LoginView, LogoutView, RefreshView, 
     UserProfileView, UserDetailView,
     AddressListCreateView, AddressDetailView,
-    AdminUserProfileDetailView
+    AdminUserProfileDetailView,
+    ForgotPasswordView, ResetPasswordView
 )
 
 urlpatterns = [
@@ -11,6 +12,8 @@ urlpatterns = [
     path('login', LoginView.as_view(), name='auth_login'),
     path('logout', LogoutView.as_view(), name='auth_logout'),
     path('refresh', RefreshView.as_view(), name='auth_refresh'),
+    path('forgot-password', ForgotPasswordView.as_view(), name='forgot_password'),
+    path('reset-password', ResetPasswordView.as_view(), name='reset_password'),
     
     # Profile endpoints
     path('profile/me/', UserProfileView.as_view(), name='profile_me'),
