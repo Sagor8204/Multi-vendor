@@ -1,10 +1,10 @@
 from django.db import models
 from django.utils.text import slugify
-from apps.core.models import BaseModel
+from apps.core.models import BaseModel, SEOMixin
 from apps.vendor.models import Vendor
 
 # Create your models here.
-class Category(BaseModel):
+class Category(BaseModel, SEOMixin):
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE)
@@ -17,7 +17,7 @@ class Category(BaseModel):
         super().save(*args, **kwargs)
 
 
-class Product(BaseModel):
+class Product(BaseModel, SEOMixin):
     STATUS_CHOICES = (
         ('draft', 'Draft'),
         ('pending', 'Pending Approval'),

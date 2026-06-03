@@ -25,16 +25,27 @@ class vendorSerializer(serializers.ModelSerializer):
 
 class CategorySerializer(serializers.ModelSerializer):
     product_count = serializers.SerializerMethodField()
+    seo_metadata = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
         fields = (
             'id', 'name', 'slug', 'parent', 'description', 'icon', 
-            'product_count', 'created_at', 'updated_at'
+            'product_count', 'meta_title', 'meta_description', 'meta_keywords',
+            'og_title', 'og_description', 'og_image', 'seo_metadata',
+            'created_at', 'updated_at'
         )
 
     def get_product_count(self, obj):
         return obj.product_set.filter(status="published").count()
+
+    def get_seo_metadata(self, obj):
+        return {
+            "title": obj.get_meta_title(),
+            "description": obj.meta_description or (obj.description[:160] if obj.description else ""),
+            "keywords": obj.meta_keywords,
+            "og_image": obj.og_image.url if obj.og_image else (obj.icon.url if obj.icon else None)
+        }
 
 class ProductAttributeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -110,6 +121,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     average_rating = serializers.SerializerMethodField()
     total_review = serializers.SerializerMethodField()
+    seo_metadata = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -117,6 +129,8 @@ class ProductSerializer(serializers.ModelSerializer):
             'id', 'vendor', 'name', 'slug', 'description', 'category',
             'price', 'discount_price', 'discount_percentage', 'stock', 'status', 'is_featured',
             'views_count', 'images', 'variants', 'specifications', 'reviews', 'average_rating', 'total_review',
+            'meta_title', 'meta_description', 'meta_keywords',
+            'og_title', 'og_description', 'og_image', 'seo_metadata',
             'created_at', 'updated_at'
         )
         read_only_fields = ('vendor', 'slug', 'status', 'views_count', 'discount_percentage')
@@ -127,6 +141,14 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def get_total_review(self, obj):
         return obj.reviews.count()
+
+    def get_seo_metadata(self, obj):
+        return {
+            "title": obj.get_meta_title(),
+            "description": obj.meta_description or (obj.description[:160] if obj.description else ""),
+            "keywords": obj.meta_keywords,
+            "og_image": obj.og_image.url if obj.og_image else (obj.images.first().image.url if obj.images.exists() else None)
+        }
 
     def create(self, validated_data):
         variants_data = validated_data.pop('variants', [])

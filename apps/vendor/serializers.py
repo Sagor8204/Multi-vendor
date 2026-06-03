@@ -15,10 +15,17 @@ class VendorSerializer(serializers.ModelSerializer):
     product_count = serializers.SerializerMethodField()
     vendor_rating = serializers.SerializerMethodField()
     total_reviews = serializers.SerializerMethodField()
+    seo_metadata = serializers.SerializerMethodField()
 
     class Meta:
         model = Vendor
-        fields = ['id', 'store_name', 'store_logo', 'store_description', 'product_count', 'is_approved', 'vendor_rating', 'total_reviews', 'created_at']
+        fields = [
+            'id', 'store_name', 'store_logo', 'store_description', 'product_count', 
+            'is_approved', 'vendor_rating', 'total_reviews',
+            'meta_title', 'meta_description', 'meta_keywords',
+            'og_title', 'og_description', 'og_image', 'seo_metadata',
+            'created_at'
+        ]
         read_only_fields = ['id', 'is_approved', 'created_at']
 
     def get_product_count(self,obj):
@@ -31,6 +38,14 @@ class VendorSerializer(serializers.ModelSerializer):
 
     def get_total_reviews(self, obj):
         return Review.objects.filter(product__vendor=obj).count()
+
+    def get_seo_metadata(self, obj):
+        return {
+            "title": obj.get_meta_title(),
+            "description": obj.meta_description or (obj.store_description[:160] if obj.store_description else ""),
+            "keywords": obj.meta_keywords,
+            "og_image": obj.og_image.url if obj.og_image else (obj.store_logo.file.url if obj.store_logo else None)
+        }
 
     def update(self, instance, validated_data):
         user = self.context['request'].user
